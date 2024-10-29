@@ -1,5 +1,5 @@
 import {Command, Flags} from '@oclif/core'
-import {providers, Wallet} from 'ethers'
+import {providers, Wallet, utils} from 'ethers'
 
 import {floodFlags} from '../../helpers/flags'
 import MevFlood, {spam} from '../../../../core/build'
@@ -40,6 +40,12 @@ export default class Spam extends Command {
       required: false,
       default: 'mempool',
     }),
+    profRpcUrl: Flags.string({
+      char: 'f',
+      description: 'RPC URL for Prof sequencer when using prof route',
+      required: false,
+      default: '',
+    }),
   }
 
   async run(): Promise<void> {
@@ -47,17 +53,45 @@ export default class Spam extends Command {
     const provider = new providers.JsonRpcProvider(flags.rpcUrl)
     await provider.ready
     const wallet = new Wallet(flags.privateKey, provider)
+
+    const balance = await wallet.getBalance()
+    if (balance.eq(0)) {
+      this.error(`Wallet ${wallet.address} has no ETH balance`)
+    }
+
     const deployment = flags.loadFile ? await MevFlood.loadDeployment(getDeploymentDir(flags.loadFile)) : undefined
+    if (!deployment) {
+      this.error('No deployment loaded. Please deploy contracts first using the deploy command.')
+    }
+
+    // const pairAddress = deployment.pairs[0]
+    // const code = await provider.getCode(pairAddress)
+    // if (code === '0x') {
+    //   this.error(`UniV2 pair contract not found at ${pairAddress}`)
+    // }
+
     const flood = new MevFlood(wallet, provider, deployment)
-    this.log(`connected to ${flags.rpcUrl} with wallet ${wallet.address}`)
+    this.log(`Connected to ${flags.rpcUrl} with wallet ${wallet.address}`)
+    this.log(`Wallet balance: ${utils.formatEther(balance)} ETH`)
+
     const txStrategy = flags.revert ? TxStrategy.UniV2Reverting : TxStrategy.UniV2
     const sendTo = flags.sendTo.toLowerCase()
 
+    if (sendTo === 'prof' && !flags.profRpcUrl) {
+      this.error('profRpcUrl is required when using prof route')
+    }
+
+    this.log(`Made it to the spam loop sending to ${sendTo}`)
+
     await spam.spamLoop(flood, wallet, {
       txsPerBundle: flags.txsPerBundle,
-      sendRoute: sendTo === 'flashbots' ? SendRoute.Flashbots : (sendTo === 'mevshare' ? SendRoute.MevShare : SendRoute.Mempool),
+      sendRoute: sendTo === 'flashbots' ? SendRoute.Flashbots : 
+                 (sendTo === 'mevshare' ? SendRoute.MevShare : 
+                 (sendTo === 'prof' ? SendRoute.Prof : SendRoute.Mempool)),
       secondsPerBundle: flags.secondsPerBundle,
       txStrategy,
+      profRpcUrl: flags.profRpcUrl,
     })
   }
 }
+

@@ -10,6 +10,7 @@ import { GWEI, populateTxFully, serializePendingTx, textColors } from './lib/hel
 import { ILiquidDeployment, LiquidDeployment, loadDeployment as loadDeploymentLib } from './lib/liquid'
 import scripts, { LiquidParams } from './lib/scripts'
 import { approveIfNeeded, SwapOptions, PendingSwap } from './lib/swap'
+import fetch from 'node-fetch';
 
 // TODO: remove this once flashbots/ethers-provider-bundle & mev-flood are updated to use ethers v6 throughout
 const ethersV6 = require('ethersV6')
@@ -137,6 +138,53 @@ class MevFlood {
         }
     }
 
+
+    /**
+     * Sends a bundle of transactions to Prof Sequencer.
+     * @param signedTxs Array of raw signed transactions.
+     * @param profRpcUrl The RPC URL of the Prof sequencer
+     * @param targetBlock Target block number for the bundle
+     * @returns Response from the Prof sequencer
+     */
+    async sendToProf(signedTxs: string[], profRpcUrl: string, targetBlock: number) {
+        console.log(`Sending bundle to Prof RPC: ${profRpcUrl}`);
+        try {
+            const baseUrl = profRpcUrl.replace(/\/$/, '');
+            
+            const payload = {
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'eth_sendBundle',
+                params: [{
+                    txs: signedTxs,
+                    blockNumber: `0x${targetBlock.toString(16)}`,
+                }]
+            };
+            
+            console.log('Request payload:', JSON.stringify(payload, null, 2));
+
+            const url = `${baseUrl}/eth_sendBundle`;
+            console.log(`Trying URL: ${url}`);
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                console.log(`Bundle sent successfully. Status: ${response.status}`);
+                return;
+            }
+
+            throw new Error(`Request failed with status: ${response.status}`);
+        } catch (error: any) {
+            console.error('Error sending to Prof:', error);
+            throw error;
+        }
+    }
+
     async sendToMevShare(signedTxs: string[], options: TransactionOptions) {
         if (this.matchmaker) {
             return await Promise.all(
@@ -244,6 +292,8 @@ class MevFlood {
                 sendToMempool: async () => this.sendToMempool(swaps.signedSwaps.map(swap => swap.signedTx)),
                 /** Send all swaps to mev-share. */
                 sendToMevShare: async (shareOptions: TransactionOptions) => this.sendToMevShare(swaps.signedSwaps.map(swap => swap.signedTx), shareOptions),
+                /** Send all swaps to Prof. */
+                sendToProf: async (profRpcUrl: string, targetBlock: number) => this.sendToProf(swaps.signedSwaps.map(swap => swap.signedTx), profRpcUrl, targetBlock),
             }
         } else {
             throw new Error("Must initialize MevFlood with a liquid deployment to send swaps")
@@ -388,6 +438,7 @@ class MevFlood {
             throw new Error("Must initialize MevFlood with a liquid deployment to send approvals.")
         }
     }
+
 }
 
 export default MevFlood

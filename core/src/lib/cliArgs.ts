@@ -15,6 +15,7 @@ export enum SendRoute {
     Flashbots,
     Mempool,
     MevShare,
+    Prof
 }
 
 export const getOption = (args: string[], flagIndex: number, argType?: "string" | "number" | "boolean") => {

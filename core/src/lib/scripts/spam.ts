@@ -22,12 +22,18 @@ export const spam = async (
         txsPerBundle: number,
         sendRoute: SendRoute,
         txStrategy?: TxStrategy,
+        profRpcUrl?: string,
 }) => {
+
+    console.log('Generating swaps with params:', params)
+    
     const swapParams: SwapOptions = params.txStrategy === TxStrategy.UniV2Reverting ? {
         minUSD: 1000000000000, // $1T trade should revert
         swapWethForDai: false, // always swap DAI for WETH
         daiIndex: 0, // always use the first DAI contract
     } : {}
+
+    console.log('Generating swaps with params:', swapParams)
     // calling generateSwaps with only one wallet will produce a bundle with only one tx
     const txBundles = await Promise.all(
         Array(params.txsPerBundle)
@@ -39,10 +45,17 @@ export const spam = async (
         )))
     const bundle = txBundles.map(txb => txb.swaps.signedSwaps.map(s => s.signedTx)).flat()
 
+    console.log('Sending bundle:', bundle)
+
     if (params.sendRoute === SendRoute.Mempool) {
         mevFlood.sendToMempool(bundle).catch((e) => {console.warn("caught", e)})
     } else if (params.sendRoute === SendRoute.MevShare) {
         mevFlood.sendToMevShare(bundle, {hints: {calldata: true, logs: true}}).catch((e) => {console.warn(e)})
+    } else if (params.sendRoute === SendRoute.Prof) {
+        if (!params.profRpcUrl) {
+            throw new Error("Prof RPC URL is required when using Prof route")
+        }
+        mevFlood.sendToProf(bundle, params.profRpcUrl, params.targetBlockNumber).catch((e) => {console.warn(e)})
     } else {
         mevFlood.sendBundle(bundle, params.targetBlockNumber).catch((e) => {console.warn(e)})
     }
@@ -54,6 +67,7 @@ export const spamLoop = async (mevFlood: MevFlood, wallet: Wallet, params: {
     sendRoute: SendRoute,
     secondsPerBundle: number,
     txStrategy?: TxStrategy,
+    profRpcUrl?: string,
 }) => {
     try {
         await wallet.provider.getBlockNumber()
@@ -64,7 +78,13 @@ export const spamLoop = async (mevFlood: MevFlood, wallet: Wallet, params: {
     let lastBlockSampledAt = now()
     let targetBlockNumber = await wallet.provider.getBlockNumber() + 1
     while (true) {
-        spam(mevFlood, wallet, {targetBlockNumber, txsPerBundle: params.txsPerBundle, sendRoute: params.sendRoute, txStrategy: params.txStrategy})
+        spam(mevFlood, wallet, {
+            targetBlockNumber, 
+            txsPerBundle: params.txsPerBundle, 
+            sendRoute: params.sendRoute, 
+            txStrategy: params.txStrategy,
+            profRpcUrl: params.profRpcUrl
+        })
         await sleep(params.secondsPerBundle * 1000)
         if (now() - lastBlockSampledAt > 12000) {
             targetBlockNumber += 1

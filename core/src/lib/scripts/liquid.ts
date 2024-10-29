@@ -127,12 +127,17 @@ const generateLiquidDeployment = async (params: LiquidParams, provider: provider
         }
         const weth = await getCloneDeployment(contracts.WETH, await getAdminNonce()) // weth has no constructor args
         wethAddress = weth.contractAddress
+        console.log(`WETH contract address: ${wethAddress}`) // Log WETH address
+
 
         // uniswapv2 factories
         const uniV2FactoryA = await getCloneDeployment(contracts.UniV2Factory, await getAdminNonce(), [adminWallet.address])
         const uniV2FactoryB = await getCloneDeployment(contracts.UniV2Factory, await getAdminNonce(), [adminWallet.address])
         uniV2FactoryAddressA = uniV2FactoryA.contractAddress
         uniV2FactoryAddressB = uniV2FactoryB.contractAddress
+        console.log(`UniV2FactoryA contract address: ${uniV2FactoryAddressA}`) // Log UniV2FactoryA address
+        console.log(`UniV2FactoryB contract address: ${uniV2FactoryAddressB}`) // Log UniV2FactoryB address
+
 
         // custom router
         const atomicSwap = await getCloneDeployment(contracts.AtomicSwap, await getAdminNonce(), [weth.contractAddress])
@@ -176,6 +181,12 @@ const generateLiquidDeployment = async (params: LiquidParams, provider: provider
         uniV2FactoryAddressA = deployment.uniV2FactoryA.contractAddress
         uniV2FactoryAddressB = deployment.uniV2FactoryB.contractAddress
         atomicSwapAddress = deployment.atomicSwap.contractAddress
+
+        console.log(`Loaded DAI contract addresses: ${daiAddrs.join(', ')}`)
+        console.log(`Loaded WETH contract address: ${wethAddress}`)
+        console.log(`Loaded UniV2FactoryA contract address: ${uniV2FactoryAddressA}`)
+        console.log(`Loaded UniV2FactoryB contract address: ${uniV2FactoryAddressB}`)
+        console.log(`Loaded AtomicSwap contract address: ${atomicSwapAddress}`)
     }
 
     const wethContract = new Contract(wethAddress, contracts.WETH.abi)
