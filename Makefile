@@ -1,2 +1,2 @@
 docker-build:
-	docker build --no-cache -t prof-project/mev-flood .
+	docker build -t prof-project/mev-flood .
