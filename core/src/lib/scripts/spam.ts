@@ -3,6 +3,7 @@ import MevFlood from '../..'
 import { SendRoute } from '../cliArgs'
 import { now } from '../helpers'
 import { SwapOptions } from '../swap'
+import { FormatTypes } from 'ethers/lib/utils'
 
 const sleep = (ms: number) => {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -23,6 +24,7 @@ export const spam = async (
         sendRoute: SendRoute,
         txStrategy?: TxStrategy,
         profRpcUrl?: string,
+        nonceOffset?: number,
 }) => {
 
     console.log('Generating swaps with params:', params)
@@ -41,7 +43,7 @@ export const spam = async (
         .map((_, idx) => mevFlood.generateSwaps(
             swapParams,
             [wallet],
-            idx
+            (params.nonceOffset || 0) + idx
         )))
     const bundle = txBundles.map(txb => txb.swaps.signedSwaps.map(s => s.signedTx)).flat()
 
@@ -56,12 +58,15 @@ export const spam = async (
             throw new Error("Prof RPC URL is required when using Prof route")
         }
         mevFlood.sendToProf(bundle, params.profRpcUrl, params.targetBlockNumber).catch((e) => {console.warn(e)})
+        // mevFlood.sendToMempool(bundle).catch((e) => {console.warn("caught", e)})
     } else {
         mevFlood.sendBundle(bundle, params.targetBlockNumber).catch((e) => {console.warn(e)})
     }
 }
 
 /** Spams continuously, updating the target block if needed. */
+// NOTE - currently overwrites nonce for testing! Sequencer does not interface with execution clients and does hence cannot rely on getTransactionCount()
+// NOTE - TX can only be sent to PROF, not to regular mempool in parallel! Otherwise there is a nonce mismatch. 
 export const spamLoop = async (mevFlood: MevFlood, wallet: Wallet, params: {
     txsPerBundle: number,
     sendRoute: SendRoute,
@@ -77,15 +82,20 @@ export const spamLoop = async (mevFlood: MevFlood, wallet: Wallet, params: {
     }
     let lastBlockSampledAt = now()
     let targetBlockNumber = await wallet.provider.getBlockNumber() + 1
+    let nonceOffset = 0
     while (true) {
+        console.log(`nonceOffset before: ${nonceOffset}`)
         spam(mevFlood, wallet, {
             targetBlockNumber, 
             txsPerBundle: params.txsPerBundle, 
             sendRoute: params.sendRoute, 
             txStrategy: params.txStrategy,
-            profRpcUrl: params.profRpcUrl
+            profRpcUrl: params.profRpcUrl,
+            nonceOffset,
         })
         await sleep(params.secondsPerBundle * 1000)
+        nonceOffset += params.txsPerBundle
+        console.log(`nonceOffset: ${nonceOffset}`)
         if (now() - lastBlockSampledAt > 12000) {
             targetBlockNumber += 1
             lastBlockSampledAt = now()

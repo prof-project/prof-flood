@@ -274,7 +274,11 @@ class MevFlood {
      */
     async generateSwaps(swapParams: SwapOptions, fromWallets: Wallet[], nonceOffset?: number) {
         if (this.deployment) {
-            const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment, {offset: nonceOffset})
+            const currentNonce = await this.provider.getTransactionCount(fromWallets[0].address)
+            console.log(`Current nonce for ${fromWallets[0].address}: ${currentNonce}`)
+            // const finalNonce = currentNonce + (nonceOffset || 0)
+            // console.log(`Incremented nonce offset: ${finalNonce}`)
+            const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment, {override: nonceOffset})
 
             // simulate each tx
             for (const swap of swaps.signedSwaps) {

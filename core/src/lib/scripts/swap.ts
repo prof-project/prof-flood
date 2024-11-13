@@ -34,13 +34,20 @@ export const createSwaps = async (options: SwapOptions, provider: providers.Json
             swapParams.push(swap)
             const wethForDai = swap.path[0].toLowerCase() === deployment.weth.contractAddress.toLowerCase()
             console.log(`[${wallet.address}] swapping ${formatEther(swap.amountIn)} ${wethForDai ? "WETH" : "DAI"} for ${wethForDai ? "DAI" : "WETH"}`)
+            const currentNonce = await wallet.getTransactionCount()
+            console.log('Nonce calculation debug:')
+            console.log('- currentNonce (from getTransactionCount):', currentNonce)
+            console.log('- nonce.override:', nonce.override)
+            console.log('- nonce.offset:', nonce.offset)
+            console.log('- Final nonce value:', (nonce.override ? currentNonce + nonce.override : (currentNonce + (nonce.offset || 0))))
+            
             const signedSwap = await signSwap(
                 atomicSwapContract,
                 swap.uniFactoryAddress,
                 wallet,
                 swap.amountIn,
                 swap.path,
-                nonce.override || (await wallet.getTransactionCount()) + (nonce.offset || 0),
+                (nonce.override ? currentNonce + nonce.override : (currentNonce + (nonce.offset || 0))),
                 provider.network.chainId,
                 options.gasFees
             )
