@@ -163,7 +163,7 @@ class MevFlood {
             
             console.log('Request payload:', JSON.stringify(payload, null, 2));
 
-            const url = `${baseUrl}/eth_sendBundle`;
+            const url = `${baseUrl}/sequencer/eth_sendBundle`;
             console.log(`Trying URL: ${url}`);
             const response = await fetch(url, {
                 method: 'POST',
