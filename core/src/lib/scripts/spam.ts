@@ -24,7 +24,6 @@ export const spam = async (
         sendRoute: SendRoute,
         txStrategy?: TxStrategy,
         profRpcUrl?: string,
-        nonceOffset?: number,
 }) => {
 
     console.log('Generating swaps with params:', params)
@@ -43,7 +42,7 @@ export const spam = async (
         .map((_, idx) => mevFlood.generateSwaps(
             swapParams,
             [wallet],
-            (params.nonceOffset || 0) + idx
+            idx
         )))
     const bundle = txBundles.map(txb => txb.swaps.signedSwaps.map(s => s.signedTx)).flat()
 
@@ -82,20 +81,16 @@ export const spamLoop = async (mevFlood: MevFlood, wallet: Wallet, params: {
     }
     let lastBlockSampledAt = now()
     let targetBlockNumber = await wallet.provider.getBlockNumber() + 1
-    let nonceOffset = 0
+
     while (true) {
-        console.log(`nonceOffset before: ${nonceOffset}`)
         spam(mevFlood, wallet, {
             targetBlockNumber, 
             txsPerBundle: params.txsPerBundle, 
             sendRoute: params.sendRoute, 
             txStrategy: params.txStrategy,
             profRpcUrl: params.profRpcUrl,
-            nonceOffset,
         })
         await sleep(params.secondsPerBundle * 1000)
-        nonceOffset += params.txsPerBundle
-        console.log(`nonceOffset: ${nonceOffset}`)
         if (now() - lastBlockSampledAt > 12000) {
             targetBlockNumber += 1
             lastBlockSampledAt = now()

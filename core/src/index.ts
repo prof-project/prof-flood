@@ -1,16 +1,16 @@
 /** module exports for using mev-flood as a library */
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
-import { Wallet, providers, Transaction } from 'ethers'
+import Matchmaker, { BundleParams, IPendingTransaction, TransactionOptions } from "@flashbots/matchmaker-ts"
+import { providers, Transaction, Wallet } from 'ethers'
 import fs from "fs/promises"
 import { BackrunOptions, generateBackrunTx } from './lib/backrun'
-import Matchmaker, { BundleParams, IPendingTransaction, TransactionOptions } from "@flashbots/matchmaker-ts"
 
 // lib
+import fetch from 'node-fetch'
 import { GWEI, populateTxFully, serializePendingTx, textColors } from './lib/helpers'
 import { ILiquidDeployment, LiquidDeployment, loadDeployment as loadDeploymentLib } from './lib/liquid'
 import scripts, { LiquidParams } from './lib/scripts'
-import { approveIfNeeded, SwapOptions, PendingSwap } from './lib/swap'
-import fetch from 'node-fetch';
+import { approveIfNeeded, PendingSwap, SwapOptions } from './lib/swap'
 
 // TODO: remove this once flashbots/ethers-provider-bundle & mev-flood are updated to use ethers v6 throughout
 const ethersV6 = require('ethersV6')
@@ -274,11 +274,7 @@ class MevFlood {
      */
     async generateSwaps(swapParams: SwapOptions, fromWallets: Wallet[], nonceOffset?: number) {
         if (this.deployment) {
-            const currentNonce = await this.provider.getTransactionCount(fromWallets[0].address)
-            console.log(`Current nonce for ${fromWallets[0].address}: ${currentNonce}`)
-            // const finalNonce = currentNonce + (nonceOffset || 0)
-            // console.log(`Incremented nonce offset: ${finalNonce}`)
-            const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment, {override: nonceOffset})
+            const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment, {offset: nonceOffset})
 
             // simulate each tx
             for (const swap of swaps.signedSwaps) {
